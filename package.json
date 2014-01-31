@@ -12,7 +12,10 @@
     "koa-static": "~1.4.2",
     "socket.io": "~1.0.0",
     "co-easymongo": "~0.2.2",
-    "co": "~3.0.2"
+    "co": "~3.0.2",
+    "koa-logger": "~1.1.1",
+    "koa-sess": "0.0.6",
+    "koa-redis": "0.0.2"
   },
   "devDependencies": {},
   "author": "",

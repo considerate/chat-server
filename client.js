@@ -70,6 +70,12 @@
 			lobby: lobbyName
 		});
 		joinedRoom = lobbyName;
+		var roomSpan = id('current-room');
+		for(var i = 0; i < roomSpan.children.length; i++) {
+			roomSpan.removeChild(roomSpan.children[i]);	
+		}
+		var text = tnode(joinedRoom);
+		roomSpan.appendChild(text);
 	});
 
 }(window));
