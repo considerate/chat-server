@@ -15,7 +15,11 @@
     "co": "~3.0.2",
     "koa-logger": "~1.1.1",
     "koa-sess": "0.0.6",
-    "koa-redis": "0.0.2"
+    "koa-redis": "0.0.2",
+    "koa-router": "~2.4.4",
+    "co-body": "0.0.1",
+    "cookies": "~0.3.8",
+    "redis": "~0.10.0"
   },
   "devDependencies": {},
   "author": "",

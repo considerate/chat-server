@@ -25,16 +25,6 @@
 		prependMesage(data, id('room-messages'));
 	});
 
-	var userForm = id('user-form');
-	userForm.addEventListener('submit', function(event) {
-		event.preventDefault();
-		var field = id('user-field');
-		username = field.value;
-		field.value = '';
-		id('main').removeAttribute('hidden');
-		id('username').setAttribute('hidden','hidden');
-	});
-
 	var messageForm = id('message-form');
 	messageForm.addEventListener('submit', function(event) {
 		event.preventDefault();
@@ -45,6 +35,24 @@
 			body: messageText,
 			user: username
 		});
+	});
+
+	var chatForm = id('start-chat-form');
+	chatForm.addEventListener('submit', function(event) {
+		event.preventDefault();
+		console.log('Hello there');
+		var field = id('friend-field');
+		var friendID = field.value;
+		field.value = '';
+		var friends = [friendID];
+		socket.emit('start chat', {
+			user: username,
+			friends: friends
+		});
+	});
+
+	socket.on('chat started', function(data) {
+		console.log(data);
 	});
 
 	var roomForm = id('room-message-form');

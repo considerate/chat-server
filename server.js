@@ -3,24 +3,58 @@ var send = require('koa-send');
 var serve = require('koa-static');
 var co = require('co');
 var logger = require('koa-logger');
+var redis = require("redis");
+var redisClient = redis.createClient();
+  var Cookies = require('cookies');
 
 var mongo = require('co-easymongo')({
   dbname: 'chattest'
 });
 
 var messages = mongo.collection('messages');
+var users = mongo.collection('users');
+var chats = mongo.collection('chats');
 
+var parse = require('co-body');
 var session = require('koa-sess');
 var koaRedis = require('koa-redis');
 var redisStore = koaRedis();
-
+var router = require('koa-router');
 app.keys = ['some secret'];
 
 app.use(session({
   store: redisStore
 }));
 
+app.use(router(app));
+
 app.use(logger());
+
+app.get('/login', function *() {
+  yield send(this, __dirname+'/login.html');
+});
+
+app.post('/login', function* () {
+  var body = yield parse.form(this);
+  var res = yield users.find({username: body.username},{limit: 1});
+  var doc = res[0];
+  if(doc) {
+    this.session.loggedIn = true;
+    this.session.username = body.username;
+    this.redirect('/');
+  }else {
+    this.statusCode = 401;
+  }
+});
+
+app.use(function *(next) {
+  if(this.session.loggedIn) {
+    yield next;
+  }
+  else {
+    this.redirect('/login');
+  }
+});
 
 app.use(serve('.'));
 
@@ -49,26 +83,32 @@ function validate(data) {
 }
 
 var io = require('socket.io')(server);
-
-io.use(function(socket, next) {
-  console.log(socket.client.id);
-  var Cookies = require('cookies');
+function* getSession(socket) {
   var cookies = new Cookies( socket.request, socket.request.res, app.keys);
   var sid = cookies.get('koa.sid');
   socket.koasid = sid;
-  if(sid) {
-    co(function* () {
-      var session = yield redisStore.get(sid); 
-      var myid = socket.client.id;
-      session.socketID = myid;
-      yield redisStore.set(sid,session);
-      next();
-    })();
+  if(sid) { 
+    var session = yield redisStore.get(sid);
+    socket.username = session.username;
+    return session;
   }
+}
+
+
+io.use(function(socket, next) {
+  co(function* () {
+    var session = yield getSession(socket);
+    if(session.loggedIn) {
+      var key = 'user:username:'+session.username;
+      var value = socket.client.id;
+      redisClient.set(key, value, function() {
+        next();
+      });
+    }
+  })();
 });
 
 io.on('connection', function(socket) {
-
   co(function* (){
     var result = yield messages.find({
       room: '/'
@@ -94,7 +134,6 @@ io.on('connection', function(socket) {
     } catch(e) {
       return;
     }
-  	console.log('Recieved data', data);
   	io.sockets.emit('message',data);
     co(function* () {
       yield messages.save({
@@ -103,6 +142,18 @@ io.on('connection', function(socket) {
         date: new Date(),
         room: '/'
       });
+    })();
+  });
+
+  socket.on('start chat', function (data) {
+    co(function* () {
+      var friends = data.friends;
+      var user = socket.username;
+      var chatUsers = [user].concat(friends);
+      var result = yield chats.save({
+        users: chatUsers
+      });
+      socket.emit('chat started', result);
     })();
   });
 
@@ -115,7 +166,6 @@ io.on('connection', function(socket) {
     } catch (e) {
       return;
     }
-  	console.log('Recieved data', data);
     if(data.rooms) {
       data.rooms.forEach(function(room) {
         sendMessageToRoom(room);
@@ -125,7 +175,6 @@ io.on('connection', function(socket) {
       sendMessageToRoom(data.room);
     }
     function sendMessageToRoom(room) {
-      console.log('Here', room);
       io.sockets.in(room).emit('room message', {
         body: data.body,
         user: data.user,
@@ -168,7 +217,6 @@ io.on('connection', function(socket) {
         });
       }
     })();
-
   });
 
   socket.on('disconnect', function(){});
