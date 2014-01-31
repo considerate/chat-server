@@ -4,7 +4,33 @@
 	<title>Socket Client</title>
 </head>
 <body>
-<script type="text/javascript" src="/socket.io/socket.io.js"></script>
-<script type="text/javascript" src="client.js"></script>
+	<div id="username">
+		<h1>Select username</h1>
+		<form id="user-form">
+			<input type="text" id="user-field"/>
+			<input type="submit" value="pick"/>
+		</form>
+	</div>
+	<div id="main" hidden="hidden">
+		<h1>General Chat</h1>
+		<form id="message-form">
+			<input type="text" id="message-field"/>
+			<input type="submit" value="send"/>
+		</form>
+		<ul id="messages"></ul>
+
+		<h1>Current Chat Room</h1>
+		<form id="join-lobby-form">
+			<input type="text" id="lobby-field">
+			<input type="submit" value="join">
+		</form>
+		<form id="room-message-form">
+			<input type="text" id="room-message-field"/>
+			<input type="submit" value="send"/>
+		</form>
+		<ul id="room-messages"></ul>
+	</div>
+	<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+	<script type="text/javascript" src="client.js"></script>
 </body>
 </html>
