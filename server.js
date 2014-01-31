@@ -34,6 +34,12 @@ app.get('/login', function *() {
   yield send(this, __dirname+'/login.html');
 });
 
+var socketMap = new Map();
+redisClient.keys('user:username:*', function (keys) {
+  redisClient.del(keys, function() {
+    console.log('deleted old keys');
+  });
+});
 app.post('/login', function* () {
   var body = yield parse.form(this);
   var res = yield users.find({username: body.username},{limit: 1});
@@ -67,6 +73,12 @@ function* _(array) {
   }
 }
 
+
+function getFromRedis(key) {
+  return function(done) {
+    redisClient.get(key, done);
+  }
+}
 
 function reqStr(obj) {
   if(typeof obj !== 'string') {
@@ -109,6 +121,19 @@ io.use(function(socket, next) {
 });
 
 io.on('connection', function(socket) {
+  socketMap.set(socket.id,socket);
+  console.log('map size: ',socketMap.size);
+  co(function* () {
+    var result = yield chats.find({
+      users: {
+        $in: [socket.username]
+      }
+    });
+    for(var chat of _(result)) {
+      socket.join(chat._id);
+      socket.emit('chat started', chat);
+    }   
+  })();
   co(function* (){
     var result = yield messages.find({
       room: '/'
@@ -129,15 +154,17 @@ io.on('connection', function(socket) {
   socket.on('message', function(data) {
     try {
       validate(data);
-      reqStr(data.user);
       reqStr(data.body);
     } catch(e) {
       return;
     }
-  	io.sockets.emit('message',data);
+  	io.sockets.emit('message',{
+      body: data.body,
+      user: socket.username
+    });
     co(function* () {
       yield messages.save({
-        user: data.user,
+        user: socket.username,
         body: data.body,
         date: new Date(),
         room: '/'
@@ -153,14 +180,27 @@ io.on('connection', function(socket) {
       var result = yield chats.save({
         users: chatUsers
       });
+      socket.join(result._id);
       socket.emit('chat started', result);
+      var chatRoom = result._id;
+      var queries = [];
+      for(var friend of _(friends)) {
+        queries.push(getFromRedis('user:username:'+friend));
+      }
+      var results = yield queries;
+      results.forEach(function (socketid) {
+        var friendSocket = socketMap.get(socketid);
+        if(friendSocket) {
+          friendSocket.join(chatRoom);
+          friendSocket.emit('chat started', result);
+        }
+      });
     })();
   });
 
   socket.on('room message', function(data){
     try {
       validate(data);
-      reqStr(data.user);
       reqStr(data.body);
       reqStr(data.room);
     } catch (e) {
@@ -177,13 +217,12 @@ io.on('connection', function(socket) {
     function sendMessageToRoom(room) {
       io.sockets.in(room).emit('room message', {
         body: data.body,
-        user: data.user,
+        user: socket.username,
         room: room
       });
-
       co(function* () {
         yield messages.save({
-          user: data.user,
+          user: socket.username,
           body: data.body,
           date: new Date(),
           room: room
@@ -208,7 +247,6 @@ io.on('connection', function(socket) {
           date: 1
         }
       });
-
       for(var message of _(result)) {
         socket.emit('room message', {
           body: message.body,
@@ -218,10 +256,11 @@ io.on('connection', function(socket) {
       }
     })();
   });
-
-  socket.on('disconnect', function(){});
+  socket.on('disconnect', function(){
+    socketMap.delete(socket.id);
+    console.log('map size: ',socketMap.size);
+  });
 });
-
 
 
 server.listen(3000);

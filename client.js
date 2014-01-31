@@ -7,7 +7,7 @@
 	var joinedRoom = false;
 	var username = '';
 
-	var socket = io.connect('http://localhost');
+	var socket = io.connect('http://'+window.location.hostname);
 
 	function prependMesage(message, element) {
 		var li = create('li');
@@ -40,7 +40,6 @@
 	var chatForm = id('start-chat-form');
 	chatForm.addEventListener('submit', function(event) {
 		event.preventDefault();
-		console.log('Hello there');
 		var field = id('friend-field');
 		var friendID = field.value;
 		field.value = '';
